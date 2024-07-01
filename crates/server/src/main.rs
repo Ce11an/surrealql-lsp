@@ -154,13 +154,9 @@ fn get_completion_list(
                 tree_sitter::Query::new(
                     tree_sitter_surrealql::language(),
                     r#"
-                    [
                      (from_clause
                        (keyword_from)
                        (target) @target_options . (_)?)
-
-                      ((keyword_select) @select_options . (_)?)
-                    ]
                     "#,
                 )
                 .expect("Could not initialise query")
