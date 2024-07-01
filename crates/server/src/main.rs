@@ -154,31 +154,32 @@ fn get_completion_list(
                 tree_sitter::Query::new(
                     tree_sitter_surrealql::language(),
                     r#"
-                    [
-                     (from_clause
-                       (keyword_from)
-                       (target) @target_options . (_)?)
+                    (from_clause (target) @target_options . )
 
-                      ((keyword_select) @select_options . (_)?)
-                    ]
+                    (keyword_select) @select_options
                     "#,
                 )
                 .expect("Could not initialise query")
             });
 
         let matches_iter = cursor.matches(&QUERY_INSTR_ANY, tree.root_node(), curr_doc);
+        let mut last_match: Option<(String, tree_sitter::Range)> = None;
+
         for match_ in matches_iter {
             for capture in match_.captures.iter() {
+                let capture_name = &QUERY_INSTR_ANY.capture_names()[capture.index as usize];
                 let arg_start = capture.node.range().start_point;
                 let arg_end = capture.node.range().end_point;
+
                 if cursor_matches!(cursor_line, cursor_char, arg_start, arg_end) {
-                    let capture_name = &QUERY_INSTR_ANY.capture_names()[capture.index as usize];
-                    if let Some(completion_items) =
-                        options_to_completions_map.get(capture_name.as_str())
-                    {
-                        return Some(completion_items.clone());
-                    }
+                    last_match = Some((capture_name.clone(), capture.node.range()));
                 }
+            }
+        }
+
+        if let Some((capture_name, _range)) = last_match {
+            if let Some(completion_items) = options_to_completions_map.get(capture_name.as_str()) {
+                return Some(completion_items.clone());
             }
         }
     }
