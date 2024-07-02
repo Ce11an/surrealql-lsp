@@ -16,6 +16,34 @@ fn get_target_options_completion_details() -> Vec<CompletionDetails<'static>> {
             keyword: "SPLIT",
             documentation: include_str!("./md/split.md"),
         },
+        CompletionDetails {
+            keyword: "WITH",
+            documentation: include_str!("./md/with.md"),
+        },
+        CompletionDetails {
+            keyword: "GROUP BY",
+            documentation: include_str!("./md/group_by.md"),
+        },
+        CompletionDetails {
+            keyword: "LIMIT",
+            documentation: include_str!("./md/limit.md"),
+        },
+        CompletionDetails {
+            keyword: "ORDER BY",
+            documentation: include_str!("./md/order_by.md"),
+        },
+        CompletionDetails {
+            keyword: "TIMEOUT",
+            documentation: include_str!("./md/timeout.md"),
+        },
+        CompletionDetails {
+            keyword: "EXPLAIN",
+            documentation: include_str!("./md/explain.md"),
+        },
+        CompletionDetails {
+            keyword: "PARALLEL",
+            documentation: include_str!("./md/parallel.md"),
+        },
     ]
 }
 
