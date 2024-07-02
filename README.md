@@ -74,7 +74,7 @@ Utilises [tree-sitter](https://github.com/tree-sitter/tree-sitter) for efficient
 ### Code Completion
 Provides code completion support to streamline your development workflow - ongoing!
 
-![completion](https://raw.githubusercontent.com/Ce11an/surrealql-lsp/assets/basic-completion.png)
+![Screenshot 2024-07-02 at 22 32 16](https://github.com/Ce11an/surrealql-lsp/assets/60790416/6e39965f-4e8c-41ff-bc16-125d43b4db65)
 
 ## Contributions
 We welcome contributions! If you find this project interesting and want to help, please consider contributing.
