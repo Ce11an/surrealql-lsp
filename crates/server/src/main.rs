@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tree_sitter::Point;
 
 struct CompletionDetails<'a> {
     keyword: &'a str,
@@ -54,6 +55,13 @@ fn get_select_options_completion_details() -> Vec<CompletionDetails<'static>> {
     }]
 }
 
+fn get_select_completion_details() -> Vec<CompletionDetails<'static>> {
+    vec![CompletionDetails {
+        keyword: "SELECT",
+        documentation: include_str!("./md/select.md"),
+    }]
+}
+
 fn create_completion_item(
     keyword: &str,
     documentation: &str,
@@ -84,6 +92,10 @@ fn get_options_to_completion_items_map(
 ) -> std::collections::HashMap<&'static str, Vec<tower_lsp::lsp_types::CompletionItem>> {
     let mut map = std::collections::HashMap::new();
     map.insert(
+        "select",
+        get_completion_items(get_select_completion_details()),
+    );
+    map.insert(
         "select_options",
         get_completion_items(get_select_options_completion_details()),
     );
@@ -94,12 +106,57 @@ fn get_options_to_completion_items_map(
     map
 }
 
-macro_rules! cursor_matches {
-    ($cursor_line:expr,$cursor_char:expr,$query_start:expr,$query_end:expr) => {{
-        $query_start.row == $cursor_line
-            && $query_end.row == $cursor_line
-            && $query_start.column <= $cursor_char
-    }};
+fn cursor_matches(
+    cursor_line: usize,
+    cursor_char: usize,
+    query_start: Point,
+    query_end: Point,
+) -> bool {
+    // completely envelop the cursor line-wise
+    if query_start.row < cursor_line && query_end.row > cursor_line {
+        return true;
+    }
+
+    // single line match, check columns on both sides
+    if cursor_line == query_start.row
+        && cursor_line == query_end.row
+        && query_start.column <= cursor_char
+        && query_end.column >= cursor_char
+    {
+        return true;
+    }
+
+    // start lines overlap, but the start column is before the cursor column
+    if cursor_line == query_start.row && query_start.column <= cursor_char {
+        return true;
+    }
+
+    // end lines overlap, but the end column is after the cursor column
+    if cursor_line == query_end.row && query_end.column >= cursor_char {
+        return true;
+    }
+
+    false
+}
+
+fn cursor_before(cursor_line: usize, cursor_char: usize, query_start: Point) -> bool {
+    if cursor_line < query_start.row
+        || (cursor_line == query_start.row && cursor_char < query_start.column)
+    {
+        return true;
+    }
+
+    false
+}
+
+fn cursor_after(cursor_line: usize, cursor_char: usize, query_end: Point) -> bool {
+    if cursor_line > query_end.row
+        || (cursor_line == query_end.row && cursor_char > query_end.column)
+    {
+        return true;
+    }
+
+    false
 }
 
 pub fn text_doc_change_to_tree_sitter_edit(
@@ -165,16 +222,6 @@ fn get_completion_list(
     *curr_tree = parser.parse(curr_doc, curr_tree.as_ref());
     if let Some(tree) = curr_tree {
         let mut cursor = tree_sitter::QueryCursor::new();
-        cursor.set_point_range(std::ops::Range {
-            start: tree_sitter::Point {
-                row: cursor_line,
-                column: 0,
-            },
-            end: tree_sitter::Point {
-                row: cursor_line,
-                column: usize::MAX,
-            },
-        });
         let curr_doc = curr_doc.as_bytes();
 
         static QUERY_INSTR_ANY: once_cell::sync::Lazy<tree_sitter::Query> =
@@ -199,7 +246,7 @@ fn get_completion_list(
                 let arg_start = capture.node.range().start_point;
                 let arg_end = capture.node.range().end_point;
 
-                if cursor_matches!(cursor_line, cursor_char, arg_start, arg_end) {
+                if cursor_matches(cursor_line, cursor_char, arg_start, arg_end) {
                     last_match = Some((capture_name.clone(), capture.node.range()));
                 }
             }
@@ -208,6 +255,83 @@ fn get_completion_list(
         if let Some((capture_name, _range)) = last_match {
             if let Some(completion_items) = options_to_completions_map.get(capture_name.as_str()) {
                 return Some(completion_items.clone());
+            }
+        }
+
+        static QUERY_STATEMEMENT_START: once_cell::sync::Lazy<tree_sitter::Query> =
+            once_cell::sync::Lazy::new(|| {
+                tree_sitter::Query::new(tree_sitter_surrealql::language(), "(ERROR) @start")
+                    .expect("Could not initialise query")
+            });
+
+        for match_ in cursor.matches(&QUERY_STATEMEMENT_START, tree.root_node(), curr_doc) {
+            for capture in match_.captures.iter() {
+                let arg_start = capture.node.range().start_point;
+                let arg_end = capture.node.range().end_point;
+
+                if cursor_matches(cursor_line, cursor_char, arg_start, arg_end) {
+                    return options_to_completions_map.get("select").cloned();
+                }
+            }
+        }
+
+        // match SELECT and ensure the next neighbor is beyond the cursor
+        static QUERY_SELECT_1: once_cell::sync::Lazy<tree_sitter::Query> =
+            once_cell::sync::Lazy::new(|| {
+                tree_sitter::Query::new(
+                    tree_sitter_surrealql::language(),
+                    r#"(
+                        (keyword_select) @select
+                        .
+                        (_) @neighbor
+
+                    )"#,
+                )
+                .expect("Could not initialise query")
+            });
+
+        for match_ in cursor.matches(&QUERY_SELECT_1, tree.root_node(), curr_doc) {
+            let caps = match_.captures;
+            if caps.len() < 2 {
+                continue;
+            }
+            let select_range = caps[0].node.range();
+            let neighbor_range = caps[1].node.range();
+            if cursor_after(cursor_line, cursor_char, select_range.end_point)
+                && cursor_before(cursor_line, cursor_char, neighbor_range.start_point)
+            {
+                return options_to_completions_map.get("select_options").cloned();
+            }
+        }
+
+        // finally, we'll restrict our query to the cursor's current line and check
+        // for a select without worrying about neighbors
+        static QUERY_SELECT_2: once_cell::sync::Lazy<tree_sitter::Query> =
+            once_cell::sync::Lazy::new(|| {
+                tree_sitter::Query::new(
+                    tree_sitter_surrealql::language(),
+                    "(keyword_select) @select",
+                )
+                .expect("Could not initialise query")
+            });
+
+        // suggest * if cursor is past but on the same line
+        cursor.set_point_range(std::ops::Range {
+            start: tree_sitter::Point {
+                row: cursor_line,
+                column: 0,
+            },
+            end: tree_sitter::Point {
+                row: cursor_line,
+                column: usize::MAX,
+            },
+        });
+        for match_ in cursor.matches(&QUERY_SELECT_2, tree.root_node(), curr_doc) {
+            for capture in match_.captures.iter() {
+                let arg_end = capture.node.range().end_point;
+                if cursor_after(cursor_line, cursor_char, arg_end) {
+                    return options_to_completions_map.get("select_options").cloned();
+                }
             }
         }
     }
