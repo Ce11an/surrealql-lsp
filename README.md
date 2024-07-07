@@ -11,10 +11,21 @@ SurrealQL LSP is built with Rust and leverages several powerful libraries:
 - [tree-sitter-surrealql](https://github.com/Ce11an/tree-sitter-surrealql)
 
 ## Installation
-Development is ongoing, so installation guides are currently limited to Neovim. To get started:
+Development is ongoing, so installation guides are currently limited to Neovim or
+Visual Studio Code. Either way, clone and change directories to the root of the repository.
 
-1. Clone this repository.
-2. Follow the instructions below to set up the LSP in Neovim.
+### Visual Studio Code
+Open Visual Studio Code in the root of the repository.
+
+Ensure that you have installed the required node modules:
+
+```posh
+cd editors/code && npm install && cd ../..
+```
+
+Once installed, you can launch the extension by pressing `F5`. This will open a new
+instance of Visual Studio Code. In the new instance, navigate to the `examples/test.surql`
+file. Start typing SurrealQL, you should see completions!
 
 ### Neovim Setup
 Add the following Lua script to your Neovim configuration:
