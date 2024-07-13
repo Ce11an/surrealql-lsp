@@ -2,31 +2,108 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tree_sitter::Point;
 
-struct CompletionDetails<'a> {
+struct KeywordDocumentation<'a> {
     keyword: &'a str,
     documentation: &'a str,
 }
 
-fn get_target_options_completion_details() -> Vec<CompletionDetails<'static>> {
-    vec![
-        CompletionDetails { keyword: "WHERE", documentation: include_str!("./md/where.md") },
-        CompletionDetails { keyword: "SPLIT", documentation: include_str!("./md/split.md") },
-        CompletionDetails { keyword: "WITH", documentation: include_str!("./md/with.md") },
-        CompletionDetails { keyword: "GROUP BY", documentation: include_str!("./md/group_by.md") },
-        CompletionDetails { keyword: "LIMIT", documentation: include_str!("./md/limit.md") },
-        CompletionDetails { keyword: "ORDER BY", documentation: include_str!("./md/order_by.md") },
-        CompletionDetails { keyword: "TIMEOUT", documentation: include_str!("./md/timeout.md") },
-        CompletionDetails { keyword: "EXPLAIN", documentation: include_str!("./md/explain.md") },
-        CompletionDetails { keyword: "PARALLEL", documentation: include_str!("./md/parallel.md") },
-    ]
+pub fn get_all_keywords_documentation() -> std::collections::HashMap<&'static str, &'static str> {
+    let mut map = std::collections::HashMap::new();
+    map.insert("EXPLAIN", include_str!("./md/explain.md"));
+    map.insert("FROM", include_str!("./md/from.md"));
+    map.insert("GROUP BY", include_str!("./md/group_by.md"));
+    map.insert("LIMIT", include_str!("./md/limit.md"));
+    map.insert("ONLY", include_str!("./md/only.md"));
+    map.insert("ORDER BY", include_str!("./md/order_by.md"));
+    map.insert("PARALLEL", include_str!("./md/parallel.md"));
+    map.insert("SELECT", include_str!("./md/select.md"));
+    map.insert("SPLIT", include_str!("./md/split.md"));
+    map.insert("TIMEOUT", include_str!("./md/timeout.md"));
+    map.insert("VALUE", include_str!("./md/value.md"));
+    map.insert("WHERE", include_str!("./md/where.md"));
+    map.insert("WITH", include_str!("./md/with.md"));
+    map
 }
 
-fn get_select_options_completion_details() -> Vec<CompletionDetails<'static>> {
-    vec![CompletionDetails { keyword: "VALUE", documentation: include_str!("./md/value.md") }]
+fn get_keyword_documentations(keywords: &[&'static str]) -> Vec<KeywordDocumentation<'static>> {
+    let documentation_map = get_all_keywords_documentation();
+    keywords
+        .iter()
+        .map(|&keyword| KeywordDocumentation {
+            keyword,
+            documentation: documentation_map.get(keyword).expect("Could not find keyword"),
+        })
+        .collect()
 }
 
-fn get_select_completion_details() -> Vec<CompletionDetails<'static>> {
-    vec![CompletionDetails { keyword: "SELECT", documentation: include_str!("./md/select.md") }]
+fn get_target_options_completion_details() -> Vec<KeywordDocumentation<'static>> {
+    let keywords = [
+        "WHERE", "SPLIT", "WITH", "GROUP BY", "LIMIT", "ORDER BY", "TIMEOUT", "EXPLAIN", "PARALLEL",
+    ];
+    get_keyword_documentations(&keywords)
+}
+
+fn get_select_options_completion_details() -> Vec<KeywordDocumentation<'static>> {
+    let keywords = ["VALUE"];
+    get_keyword_documentations(&keywords)
+}
+
+fn get_select_completion_details() -> Vec<KeywordDocumentation<'static>> {
+    let keywords = ["SELECT"];
+    get_keyword_documentations(&keywords)
+}
+
+pub fn get_keyword_documentation_at_pos<'a>(
+    curr_doc: &str,
+    parser: &mut tree_sitter::Parser,
+    curr_tree: &mut Option<tree_sitter::Tree>,
+    params: &tower_lsp::lsp_types::HoverParams,
+) -> Option<&'a str> {
+    let cursor_line = params.text_document_position_params.position.line as usize;
+    let cursor_char = params.text_document_position_params.position.character as usize;
+    let keywords_doc_map = get_all_keywords_documentation();
+
+    *curr_tree = parser.parse(curr_doc, curr_tree.as_ref());
+    if let Some(tree) = curr_tree {
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let curr_doc = curr_doc.as_bytes();
+
+        static QUERY_KEYWORDS: once_cell::sync::Lazy<tree_sitter::Query> =
+            once_cell::sync::Lazy::new(|| {
+                tree_sitter::Query::new(
+                    tree_sitter_surrealql::language(),
+                    r#"
+                    [
+                     (keyword_select)
+                     (keyword_where)
+                     (keyword_from)
+                     (keyword_group_by)
+                    ] @keywords
+                    "#,
+                )
+                .expect("Could not initialize query")
+            });
+
+        let matches_iter = cursor.matches(&QUERY_KEYWORDS, tree.root_node(), curr_doc);
+
+        for match_ in matches_iter {
+            for capture in match_.captures.iter() {
+                let node = capture.node;
+                let arg_start = capture.node.range().start_point;
+                let arg_end = capture.node.range().end_point;
+                if arg_start.row == cursor_line
+                    && arg_end.row == cursor_line
+                    && arg_start.column <= cursor_char
+                    && arg_end.column >= cursor_char
+                {
+                    if let Ok(keyword) = node.utf8_text(curr_doc) {
+                        return keywords_doc_map.get(keyword).cloned();
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 fn create_completion_item(
@@ -47,7 +124,7 @@ fn create_completion_item(
 }
 
 fn get_completion_items(
-    completion_details: Vec<CompletionDetails<'static>>,
+    completion_details: Vec<KeywordDocumentation<'static>>,
 ) -> Vec<tower_lsp::lsp_types::CompletionItem> {
     completion_details
         .iter()
@@ -341,6 +418,7 @@ impl tower_lsp::LanguageServer for Backend {
                 text_document_sync: Some(tower_lsp::lsp_types::TextDocumentSyncCapability::Kind(
                     tower_lsp::lsp_types::TextDocumentSyncKind::INCREMENTAL,
                 )),
+                hover_provider: Some(tower_lsp::lsp_types::HoverProviderCapability::Simple(true)),
                 completion_provider: Some(tower_lsp::lsp_types::CompletionOptions {
                     resolve_provider: Some(false),
                     work_done_progress_options: Default::default(),
@@ -425,6 +503,38 @@ impl tower_lsp::LanguageServer for Backend {
             }
         }
 
+        Ok(None)
+    }
+    async fn hover(
+        &self,
+        params: tower_lsp::lsp_types::HoverParams,
+    ) -> tower_lsp::jsonrpc::Result<Option<tower_lsp::lsp_types::Hover>> {
+        let curr_doc = self.curr_doc.lock().await;
+        let mut tree = self.tree.lock().await;
+        let mut parser = self.parser.lock().await;
+
+        if let Some(ref doc) = *curr_doc {
+            let documentation = get_keyword_documentation_at_pos(
+                doc.get_content(None),
+                &mut parser,
+                &mut tree,
+                &params,
+            );
+            match documentation {
+                Some(documentation_) => {
+                    return Ok(Some(tower_lsp::lsp_types::Hover {
+                        contents: tower_lsp::lsp_types::HoverContents::Markup(
+                            tower_lsp::lsp_types::MarkupContent {
+                                kind: tower_lsp::lsp_types::MarkupKind::Markdown,
+                                value: documentation_.to_string(),
+                            },
+                        ),
+                        range: None,
+                    }));
+                }
+                _ => return Ok(None),
+            }
+        }
         Ok(None)
     }
 }
