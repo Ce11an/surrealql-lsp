@@ -2,31 +2,88 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tree_sitter::Point;
 
-struct CompletionDetails<'a> {
+pub fn get_all_keywords_documentation() -> std::collections::HashMap<&'static str, &'static str> {
+    let mut map = std::collections::HashMap::new();
+    map.insert("WHERE", include_str!("./md/where.md"));
+    map.insert("SPLIT", include_str!("./md/split.md"));
+    map.insert("WITH", include_str!("./md/with.md"));
+    map.insert("GROUP BY", include_str!("./md/group_by.md"));
+    map.insert("LIMIT", include_str!("./md/limit.md"));
+    map.insert("ORDER BY", include_str!("./md/order_by.md"));
+    map.insert("TIMEOUT", include_str!("./md/timeout.md"));
+    map.insert("EXPLAIN", include_str!("./md/explain.md"));
+    map.insert("PARALLEL", include_str!("./md/parallel.md"));
+    map.insert("VALUE", include_str!("./md/value.md"));
+    map.insert("SELECT", include_str!("./md/select.md"));
+    map
+}
+
+fn find_word_at_pos(line: &str, pos: usize) -> (usize, usize) {
+    if pos >= line.len() {
+        return (line.len(), line.len());
+    }
+
+    let start = line[..pos].rfind(|c: char| !c.is_alphanumeric()).map(|i| i + 1).unwrap_or(0);
+    let end =
+        line[pos..].find(|c: char| !c.is_alphanumeric()).map(|i| pos + i).unwrap_or(line.len());
+
+    (start, end)
+}
+
+pub fn get_keyword_documentation_at_pos<'a>(
+    doc: &'a lsp_textdocument::FullTextDocument,
+    pos_params: &tower_lsp::lsp_types::TextDocumentPositionParams,
+) -> Option<&'a str> {
+    let line = pos_params.position.line as usize;
+    let character = pos_params.position.character as usize;
+
+    let line_contents = doc.get_content(Some(tower_lsp::lsp_types::Range {
+        start: tower_lsp::lsp_types::Position { line: line as u32, character: 0 },
+        end: tower_lsp::lsp_types::Position { line: line as u32, character: u32::MAX },
+    }));
+
+    let (word_start, word_end) = find_word_at_pos(&line_contents, character);
+
+    let keyword = line_contents[word_start..word_end].trim();
+
+    let all_words = get_all_keywords_documentation();
+    all_words.get(keyword).copied()
+}
+
+struct KeywordDocumentation<'a> {
     keyword: &'a str,
     documentation: &'a str,
 }
 
-fn get_target_options_completion_details() -> Vec<CompletionDetails<'static>> {
+fn get_target_options_completion_details() -> Vec<KeywordDocumentation<'static>> {
     vec![
-        CompletionDetails { keyword: "WHERE", documentation: include_str!("./md/where.md") },
-        CompletionDetails { keyword: "SPLIT", documentation: include_str!("./md/split.md") },
-        CompletionDetails { keyword: "WITH", documentation: include_str!("./md/with.md") },
-        CompletionDetails { keyword: "GROUP BY", documentation: include_str!("./md/group_by.md") },
-        CompletionDetails { keyword: "LIMIT", documentation: include_str!("./md/limit.md") },
-        CompletionDetails { keyword: "ORDER BY", documentation: include_str!("./md/order_by.md") },
-        CompletionDetails { keyword: "TIMEOUT", documentation: include_str!("./md/timeout.md") },
-        CompletionDetails { keyword: "EXPLAIN", documentation: include_str!("./md/explain.md") },
-        CompletionDetails { keyword: "PARALLEL", documentation: include_str!("./md/parallel.md") },
+        KeywordDocumentation { keyword: "WHERE", documentation: include_str!("./md/where.md") },
+        KeywordDocumentation { keyword: "SPLIT", documentation: include_str!("./md/split.md") },
+        KeywordDocumentation { keyword: "WITH", documentation: include_str!("./md/with.md") },
+        KeywordDocumentation {
+            keyword: "GROUP BY",
+            documentation: include_str!("./md/group_by.md"),
+        },
+        KeywordDocumentation { keyword: "LIMIT", documentation: include_str!("./md/limit.md") },
+        KeywordDocumentation {
+            keyword: "ORDER BY",
+            documentation: include_str!("./md/order_by.md"),
+        },
+        KeywordDocumentation { keyword: "TIMEOUT", documentation: include_str!("./md/timeout.md") },
+        KeywordDocumentation { keyword: "EXPLAIN", documentation: include_str!("./md/explain.md") },
+        KeywordDocumentation {
+            keyword: "PARALLEL",
+            documentation: include_str!("./md/parallel.md"),
+        },
     ]
 }
 
-fn get_select_options_completion_details() -> Vec<CompletionDetails<'static>> {
-    vec![CompletionDetails { keyword: "VALUE", documentation: include_str!("./md/value.md") }]
+fn get_select_options_completion_details() -> Vec<KeywordDocumentation<'static>> {
+    vec![KeywordDocumentation { keyword: "VALUE", documentation: include_str!("./md/value.md") }]
 }
 
-fn get_select_completion_details() -> Vec<CompletionDetails<'static>> {
-    vec![CompletionDetails { keyword: "SELECT", documentation: include_str!("./md/select.md") }]
+fn get_select_completion_details() -> Vec<KeywordDocumentation<'static>> {
+    vec![KeywordDocumentation { keyword: "SELECT", documentation: include_str!("./md/select.md") }]
 }
 
 fn create_completion_item(
@@ -47,7 +104,7 @@ fn create_completion_item(
 }
 
 fn get_completion_items(
-    completion_details: Vec<CompletionDetails<'static>>,
+    completion_details: Vec<KeywordDocumentation<'static>>,
 ) -> Vec<tower_lsp::lsp_types::CompletionItem> {
     completion_details
         .iter()
@@ -341,6 +398,7 @@ impl tower_lsp::LanguageServer for Backend {
                 text_document_sync: Some(tower_lsp::lsp_types::TextDocumentSyncCapability::Kind(
                     tower_lsp::lsp_types::TextDocumentSyncKind::INCREMENTAL,
                 )),
+                hover_provider: Some(tower_lsp::lsp_types::HoverProviderCapability::Simple(true)),
                 completion_provider: Some(tower_lsp::lsp_types::CompletionOptions {
                     resolve_provider: Some(false),
                     work_done_progress_options: Default::default(),
@@ -425,6 +483,31 @@ impl tower_lsp::LanguageServer for Backend {
             }
         }
 
+        Ok(None)
+    }
+    async fn hover(
+        &self,
+        params: tower_lsp::lsp_types::HoverParams,
+    ) -> tower_lsp::jsonrpc::Result<Option<tower_lsp::lsp_types::Hover>> {
+        let curr_doc = self.curr_doc.lock().await;
+        if let Some(ref doc) = *curr_doc {
+            let documentation =
+                get_keyword_documentation_at_pos(doc, &params.text_document_position_params);
+            match documentation {
+                Some(documentation_) => {
+                    return Ok(Some(tower_lsp::lsp_types::Hover {
+                        contents: tower_lsp::lsp_types::HoverContents::Markup(
+                            tower_lsp::lsp_types::MarkupContent {
+                                kind: tower_lsp::lsp_types::MarkupKind::Markdown,
+                                value: documentation_.to_string(),
+                            },
+                        ),
+                        range: None,
+                    }));
+                }
+                _ => return Ok(None),
+            }
+        }
         Ok(None)
     }
 }
