@@ -15,4 +15,3 @@ SELECT * from $history;
 -- Use the parent instance's field in a subquery (predefined variable)
 SELECT *, (SELECT * FROM events WHERE host == $parent.id) AS hosted_events FROM user;
 ```
-
