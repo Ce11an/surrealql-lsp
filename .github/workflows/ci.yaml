@@ -35,7 +35,6 @@ jobs:
     name: Rust
     runs-on: ${{ matrix.os }}
     env:
-      CC: deny_c
       RUST_CHANNEL: "${{ 'nightly' || 'stable' }}"
 
     strategy:
