@@ -87,5 +87,10 @@ Provides code completion support to streamline your development workflow - ongoi
 
 ![Screenshot 2024-07-02 at 22 32 16](https://github.com/Ce11an/surrealql-lsp/assets/60790416/6e39965f-4e8c-41ff-bc16-125d43b4db65)
 
+### Hover
+Hover over SurrealQL keyworks for documentation - ongoing!
+
+![Screenshot 2024-07-13 at 20 46 24](https://github.com/user-attachments/assets/fa99a451-0c48-4243-8c02-e455322da938)
+
 ## Contributions
 We welcome contributions! If you find this project interesting and want to help, please consider contributing.
