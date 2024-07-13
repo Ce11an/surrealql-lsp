@@ -2,6 +2,9 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tree_sitter::Point;
 
+//TODO: Only have one list
+//TODO: Cursor position on a new line
+
 pub fn get_all_keywords_documentation() -> std::collections::HashMap<&'static str, &'static str> {
     let mut map = std::collections::HashMap::new();
     map.insert("WHERE", include_str!("./md/where.md"));
