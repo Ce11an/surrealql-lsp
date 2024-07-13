@@ -117,7 +117,7 @@ fn cursor_after(cursor_line: usize, cursor_char: usize, query_end: Point) -> boo
     false
 }
 
-pub fn text_doc_change_to_tree_sitter_edit(
+fn text_doc_change_to_tree_sitter_edit(
     change: &tower_lsp::lsp_types::TextDocumentContentChangeEvent,
     doc: &lsp_textdocument::FullTextDocument,
 ) -> Result<tree_sitter::InputEdit, &'static str> {
@@ -146,11 +146,6 @@ pub fn text_doc_change_to_tree_sitter_edit(
             column: new_end_pos.character as usize,
         },
     })
-}
-
-pub struct ServerTextDocumentItem {
-    pub uri: tower_lsp::lsp_types::Url,
-    pub text: String,
 }
 
 fn initialise_parser() -> tree_sitter::Parser {
@@ -320,7 +315,7 @@ struct Backend {
 }
 
 impl Backend {
-    pub fn new(client: tower_lsp::Client) -> Self {
+    fn new(client: tower_lsp::Client) -> Self {
         Self {
             client,
             parser: Arc::new(Mutex::new(initialise_parser())),
