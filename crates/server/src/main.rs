@@ -18,36 +18,54 @@ pub fn get_all_keywords_documentation() -> std::collections::HashMap<&'static st
     map
 }
 
-fn find_word_at_pos(line: &str, pos: usize) -> (usize, usize) {
-    if pos >= line.len() {
-        return (line.len(), line.len());
-    }
-
-    let start = line[..pos].rfind(|c: char| !c.is_alphanumeric()).map(|i| i + 1).unwrap_or(0);
-    let end =
-        line[pos..].find(|c: char| !c.is_alphanumeric()).map(|i| pos + i).unwrap_or(line.len());
-
-    (start, end)
-}
-
 pub fn get_keyword_documentation_at_pos<'a>(
-    doc: &'a lsp_textdocument::FullTextDocument,
-    pos_params: &tower_lsp::lsp_types::TextDocumentPositionParams,
+    curr_doc: &str,
+    parser: &mut tree_sitter::Parser,
+    curr_tree: &mut Option<tree_sitter::Tree>,
+    params: &tower_lsp::lsp_types::HoverParams,
 ) -> Option<&'a str> {
-    let line = pos_params.position.line as usize;
-    let character = pos_params.position.character as usize;
+    let cursor_line = params.text_document_position_params.position.line as usize;
+    let cursor_char = params.text_document_position_params.position.character as usize;
+    let keywords_doc_map = get_all_keywords_documentation();
 
-    let line_contents = doc.get_content(Some(tower_lsp::lsp_types::Range {
-        start: tower_lsp::lsp_types::Position { line: line as u32, character: 0 },
-        end: tower_lsp::lsp_types::Position { line: line as u32, character: u32::MAX },
-    }));
+    *curr_tree = parser.parse(curr_doc, curr_tree.as_ref());
+    if let Some(tree) = curr_tree {
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let curr_doc = curr_doc.as_bytes();
 
-    let (word_start, word_end) = find_word_at_pos(&line_contents, character);
+        static QUERY_KEYWORDS: once_cell::sync::Lazy<tree_sitter::Query> =
+            once_cell::sync::Lazy::new(|| {
+                tree_sitter::Query::new(
+                    tree_sitter_surrealql::language(),
+                    r#"
+                    [
+                     (keyword_select)
+                     (keyword_where)
+                     (keyword_from)
+                     (keyword_group_by)
+                    ] @keywords
+                    "#,
+                )
+                .expect("Could not initialize query")
+            });
 
-    let keyword = line_contents[word_start..word_end].trim();
+        let matches_iter = cursor.matches(&QUERY_KEYWORDS, tree.root_node(), curr_doc);
+        let cursor_position = Point::new(cursor_line, cursor_char);
 
-    let all_words = get_all_keywords_documentation();
-    all_words.get(keyword).copied()
+        for match_ in matches_iter {
+            for capture in match_.captures.iter() {
+                let node = capture.node;
+                if node.start_position() <= cursor_position
+                    && cursor_position <= node.end_position()
+                {
+                    if let Ok(keyword) = node.utf8_text(curr_doc) {
+                        return keywords_doc_map.get(keyword).cloned();
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 struct KeywordDocumentation<'a> {
@@ -490,9 +508,16 @@ impl tower_lsp::LanguageServer for Backend {
         params: tower_lsp::lsp_types::HoverParams,
     ) -> tower_lsp::jsonrpc::Result<Option<tower_lsp::lsp_types::Hover>> {
         let curr_doc = self.curr_doc.lock().await;
+        let mut tree = self.tree.lock().await;
+        let mut parser = self.parser.lock().await;
+
         if let Some(ref doc) = *curr_doc {
-            let documentation =
-                get_keyword_documentation_at_pos(doc, &params.text_document_position_params);
+            let documentation = get_keyword_documentation_at_pos(
+                doc.get_content(None),
+                &mut parser,
+                &mut tree,
+                &params,
+            );
             match documentation {
                 Some(documentation_) => {
                     return Ok(Some(tower_lsp::lsp_types::Hover {
