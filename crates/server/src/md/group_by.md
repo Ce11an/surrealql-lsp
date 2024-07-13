@@ -20,4 +20,3 @@ SELECT gender, country, city FROM person GROUP BY gender, country, city;
 -- Group results with aggregate functions
 SELECT count() AS total, math::mean(age) AS average_age, gender, country FROM person GROUP BY gender, country;
 ```
-

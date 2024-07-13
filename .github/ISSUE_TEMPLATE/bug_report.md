@@ -17,7 +17,7 @@ Please try to provide information which will help us to fix the issue faster. Mi
 
 **repository link (if public, optional)**: (eg. [surrealql-lsp](https://github.com/Ce11an/surrealql-lsp))
 
-**code snippet to reproduce**: 
+**code snippet to reproduce**:
 ```sql
 -- add your code here
 

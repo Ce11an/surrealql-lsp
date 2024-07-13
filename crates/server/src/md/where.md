@@ -22,4 +22,3 @@ SELECT * FROM user WHERE (admin AND active) OR owner = true;
 -- Select filtered nested array values
 SELECT address[WHERE active = true] FROM person;
 ```
-

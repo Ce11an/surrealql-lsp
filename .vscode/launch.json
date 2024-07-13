@@ -3,25 +3,25 @@
   "version": "0.2.0",
   "configurations": [
     {
-      // Used for testing the extension with a local build of the LSP server (in `target/debug`).
-      "name": "Run Extension (Debug Build)",
-      "type": "extensionHost",
-      "request": "launch",
-      "runtimeExecutable": "${execPath}",
-      "args": [
+    // Used for testing the extension with a local build of the LSP server (in `target/debug`).
+    "name": "Run Extension (Debug Build)",
+    "type": "extensionHost",
+    "request": "launch",
+    "runtimeExecutable": "${execPath}",
+    "args": [
         "--disable-extensions",
         "--extensionDevelopmentPath=${workspaceFolder}/editors/code"
-      ],
-      "outFiles": [
+    ],
+    "outFiles": [
         "${workspaceFolder}/editors/code/out/**/*.js"
-      ],
-      "preLaunchTask": "Build Server and Extension",
-      "env": {
+    ],
+    "preLaunchTask": "Build Server and Extension",
+    "env": {
         "SERVER_PATH": "${workspaceRoot}/target/debug/surrealql-lsp-server"
-      },
-      "skipFiles": [
+    },
+    "skipFiles": [
         "<node_internals>/**/*.js"
-      ],
+    ],
     },
   ]
 }

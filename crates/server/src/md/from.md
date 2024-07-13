@@ -12,4 +12,3 @@ SELECT * FROM person;
 -- Select specific fields from a specific record
 SELECT name, address, email FROM person:tobie;
 ```
-
