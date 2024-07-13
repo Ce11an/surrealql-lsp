@@ -2,23 +2,55 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tree_sitter::Point;
 
-//TODO: Only have one list
-//TODO: Cursor position on a new line
+struct KeywordDocumentation<'a> {
+    keyword: &'a str,
+    documentation: &'a str,
+}
 
 pub fn get_all_keywords_documentation() -> std::collections::HashMap<&'static str, &'static str> {
     let mut map = std::collections::HashMap::new();
-    map.insert("WHERE", include_str!("./md/where.md"));
-    map.insert("SPLIT", include_str!("./md/split.md"));
-    map.insert("WITH", include_str!("./md/with.md"));
+    map.insert("EXPLAIN", include_str!("./md/explain.md"));
+    map.insert("FROM", include_str!("./md/from.md"));
     map.insert("GROUP BY", include_str!("./md/group_by.md"));
     map.insert("LIMIT", include_str!("./md/limit.md"));
+    map.insert("ONLY", include_str!("./md/only.md"));
     map.insert("ORDER BY", include_str!("./md/order_by.md"));
-    map.insert("TIMEOUT", include_str!("./md/timeout.md"));
-    map.insert("EXPLAIN", include_str!("./md/explain.md"));
     map.insert("PARALLEL", include_str!("./md/parallel.md"));
-    map.insert("VALUE", include_str!("./md/value.md"));
     map.insert("SELECT", include_str!("./md/select.md"));
+    map.insert("SPLIT", include_str!("./md/split.md"));
+    map.insert("TIMEOUT", include_str!("./md/timeout.md"));
+    map.insert("VALUE", include_str!("./md/value.md"));
+    map.insert("WHERE", include_str!("./md/where.md"));
+    map.insert("WITH", include_str!("./md/with.md"));
     map
+}
+
+fn get_keyword_documentations(keywords: &[&'static str]) -> Vec<KeywordDocumentation<'static>> {
+    let documentation_map = get_all_keywords_documentation();
+    keywords
+        .iter()
+        .map(|&keyword| KeywordDocumentation {
+            keyword,
+            documentation: documentation_map.get(keyword).expect("Could not find keyword"),
+        })
+        .collect()
+}
+
+fn get_target_options_completion_details() -> Vec<KeywordDocumentation<'static>> {
+    let keywords = [
+        "WHERE", "SPLIT", "WITH", "GROUP BY", "LIMIT", "ORDER BY", "TIMEOUT", "EXPLAIN", "PARALLEL",
+    ];
+    get_keyword_documentations(&keywords)
+}
+
+fn get_select_options_completion_details() -> Vec<KeywordDocumentation<'static>> {
+    let keywords = ["VALUE"];
+    get_keyword_documentations(&keywords)
+}
+
+fn get_select_completion_details() -> Vec<KeywordDocumentation<'static>> {
+    let keywords = ["SELECT"];
+    get_keyword_documentations(&keywords)
 }
 
 pub fn get_keyword_documentation_at_pos<'a>(
@@ -53,13 +85,16 @@ pub fn get_keyword_documentation_at_pos<'a>(
             });
 
         let matches_iter = cursor.matches(&QUERY_KEYWORDS, tree.root_node(), curr_doc);
-        let cursor_position = Point::new(cursor_line, cursor_char);
 
         for match_ in matches_iter {
             for capture in match_.captures.iter() {
                 let node = capture.node;
-                if node.start_position() <= cursor_position
-                    && cursor_position <= node.end_position()
+                let arg_start = capture.node.range().start_point;
+                let arg_end = capture.node.range().end_point;
+                if arg_start.row == cursor_line
+                    && arg_end.row == cursor_line
+                    && arg_start.column <= cursor_char
+                    && arg_end.column >= cursor_char
                 {
                     if let Ok(keyword) = node.utf8_text(curr_doc) {
                         return keywords_doc_map.get(keyword).cloned();
@@ -69,42 +104,6 @@ pub fn get_keyword_documentation_at_pos<'a>(
         }
     }
     None
-}
-
-struct KeywordDocumentation<'a> {
-    keyword: &'a str,
-    documentation: &'a str,
-}
-
-fn get_target_options_completion_details() -> Vec<KeywordDocumentation<'static>> {
-    vec![
-        KeywordDocumentation { keyword: "WHERE", documentation: include_str!("./md/where.md") },
-        KeywordDocumentation { keyword: "SPLIT", documentation: include_str!("./md/split.md") },
-        KeywordDocumentation { keyword: "WITH", documentation: include_str!("./md/with.md") },
-        KeywordDocumentation {
-            keyword: "GROUP BY",
-            documentation: include_str!("./md/group_by.md"),
-        },
-        KeywordDocumentation { keyword: "LIMIT", documentation: include_str!("./md/limit.md") },
-        KeywordDocumentation {
-            keyword: "ORDER BY",
-            documentation: include_str!("./md/order_by.md"),
-        },
-        KeywordDocumentation { keyword: "TIMEOUT", documentation: include_str!("./md/timeout.md") },
-        KeywordDocumentation { keyword: "EXPLAIN", documentation: include_str!("./md/explain.md") },
-        KeywordDocumentation {
-            keyword: "PARALLEL",
-            documentation: include_str!("./md/parallel.md"),
-        },
-    ]
-}
-
-fn get_select_options_completion_details() -> Vec<KeywordDocumentation<'static>> {
-    vec![KeywordDocumentation { keyword: "VALUE", documentation: include_str!("./md/value.md") }]
-}
-
-fn get_select_completion_details() -> Vec<KeywordDocumentation<'static>> {
-    vec![KeywordDocumentation { keyword: "SELECT", documentation: include_str!("./md/select.md") }]
 }
 
 fn create_completion_item(
