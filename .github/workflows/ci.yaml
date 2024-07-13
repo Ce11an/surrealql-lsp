@@ -37,7 +37,6 @@ jobs:
     env:
       CC: deny_c
       RUST_CHANNEL: "${{ 'nightly' || 'stable' }}"
-      USE_SYSROOT_ABI: "${{ '--features sysroot-abi' || '' }}"
 
     strategy:
       fail-fast: false
@@ -70,16 +69,16 @@ jobs:
         run: sed -i '/\[profile.dev]/a opt-level=1' Cargo.toml
 
       - name: Compile (tests)
-        run: cargo test --no-run --locked ${{ env.USE_SYSROOT_ABI }}
+        run: cargo test --no-run --locked
 
       # It's faster to `test` before `build` ¯\_(ツ)_/¯
       - name: Compile (surrealql-lsp)
         if: matrix.os == 'ubuntu-latest'
-        run: cargo build --quiet ${{ env.USE_SYSROOT_ABI }}
+        run: cargo build --quiet
 
       - name: Test
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'windows-latest' || github.event_name == 'push'
-        run: cargo test ${{ env.USE_SYSROOT_ABI }} -- --nocapture --quiet
+        run: cargo test -- --nocapture --quiet
 
       - name: Switch to stable toolchain
         run: |
