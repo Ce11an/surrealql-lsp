@@ -74,10 +74,19 @@ pub fn get_keyword_documentation_at_pos<'a>(
                     tree_sitter_surrealql::language(),
                     r#"
                     [
-                     (keyword_select)
-                     (keyword_where)
+                     (keyword_explain)
                      (keyword_from)
                      (keyword_group_by)
+                     (keyword_limit)
+                     (keyword_only)
+                     (keyword_order_by)
+                     (keyword_parallel)
+                     (keyword_select)
+                     (keyword_split)
+                     (keyword_timeout)
+                     (keyword_value)
+                     (keyword_where)
+                     (keyword_with)
                     ] @keywords
                     "#,
                 )

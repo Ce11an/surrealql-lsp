@@ -92,7 +92,5 @@ Hover over SurrealQL keyworks for documentation - ongoing!
 
 ![Screenshot 2024-07-13 at 20 46 24](https://github.com/user-attachments/assets/fa99a451-0c48-4243-8c02-e455322da938)
 
-
-
 ## Contributions
 We welcome contributions! If you find this project interesting and want to help, please consider contributing.
