@@ -220,12 +220,12 @@ fn normalize_document_and_cursor_position(
     let content_before_cursor = lines
         .iter()
         .take(cursor_line)
-        .map(|l| *l)
+        .copied()
         .collect::<Vec<&str>>()
         .join(join_char);
 
     let cursor_char = content_before_cursor.len() + cursor_char + 1;
-    let curr_doc = format!("{}\n", &lines.join(&join_char));
+    let curr_doc = format!("{}\n", &lines.join(join_char));
 
     (curr_doc, 0, cursor_char)
 }
@@ -261,7 +261,7 @@ fn get_completion_list(
                     (keyword_select) @select_options
                     "#,
                 )
-                .expect("Could not initialize query")
+                .expect("Could not initialise query")
             });
 
         let matches_iter = cursor.matches(&QUERY_INSTR_ANY, tree.root_node(), curr_doc);
@@ -288,7 +288,7 @@ fn get_completion_list(
         static QUERY_STATEMEMENT_START: once_cell::sync::Lazy<tree_sitter::Query> =
             once_cell::sync::Lazy::new(|| {
                 tree_sitter::Query::new(tree_sitter_surrealql::language(), "(ERROR) @start")
-                    .expect("Could not initialize query")
+                    .expect("Could not initialise query")
             });
 
         for match_ in cursor.matches(&QUERY_STATEMEMENT_START, tree.root_node(), curr_doc) {

@@ -1,2 +1,1 @@
-SELECT * FROM person:cellan 
-;
+SELECT * FROM person:cellan;
