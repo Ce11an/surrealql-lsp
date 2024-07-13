@@ -9,57 +9,24 @@ struct CompletionDetails<'a> {
 
 fn get_target_options_completion_details() -> Vec<CompletionDetails<'static>> {
     vec![
-        CompletionDetails {
-            keyword: "WHERE",
-            documentation: include_str!("./md/where.md"),
-        },
-        CompletionDetails {
-            keyword: "SPLIT",
-            documentation: include_str!("./md/split.md"),
-        },
-        CompletionDetails {
-            keyword: "WITH",
-            documentation: include_str!("./md/with.md"),
-        },
-        CompletionDetails {
-            keyword: "GROUP BY",
-            documentation: include_str!("./md/group_by.md"),
-        },
-        CompletionDetails {
-            keyword: "LIMIT",
-            documentation: include_str!("./md/limit.md"),
-        },
-        CompletionDetails {
-            keyword: "ORDER BY",
-            documentation: include_str!("./md/order_by.md"),
-        },
-        CompletionDetails {
-            keyword: "TIMEOUT",
-            documentation: include_str!("./md/timeout.md"),
-        },
-        CompletionDetails {
-            keyword: "EXPLAIN",
-            documentation: include_str!("./md/explain.md"),
-        },
-        CompletionDetails {
-            keyword: "PARALLEL",
-            documentation: include_str!("./md/parallel.md"),
-        },
+        CompletionDetails { keyword: "WHERE", documentation: include_str!("./md/where.md") },
+        CompletionDetails { keyword: "SPLIT", documentation: include_str!("./md/split.md") },
+        CompletionDetails { keyword: "WITH", documentation: include_str!("./md/with.md") },
+        CompletionDetails { keyword: "GROUP BY", documentation: include_str!("./md/group_by.md") },
+        CompletionDetails { keyword: "LIMIT", documentation: include_str!("./md/limit.md") },
+        CompletionDetails { keyword: "ORDER BY", documentation: include_str!("./md/order_by.md") },
+        CompletionDetails { keyword: "TIMEOUT", documentation: include_str!("./md/timeout.md") },
+        CompletionDetails { keyword: "EXPLAIN", documentation: include_str!("./md/explain.md") },
+        CompletionDetails { keyword: "PARALLEL", documentation: include_str!("./md/parallel.md") },
     ]
 }
 
 fn get_select_options_completion_details() -> Vec<CompletionDetails<'static>> {
-    vec![CompletionDetails {
-        keyword: "VALUE",
-        documentation: include_str!("./md/value.md"),
-    }]
+    vec![CompletionDetails { keyword: "VALUE", documentation: include_str!("./md/value.md") }]
 }
 
 fn get_select_completion_details() -> Vec<CompletionDetails<'static>> {
-    vec![CompletionDetails {
-        keyword: "SELECT",
-        documentation: include_str!("./md/select.md"),
-    }]
+    vec![CompletionDetails { keyword: "SELECT", documentation: include_str!("./md/select.md") }]
 }
 
 fn create_completion_item(
@@ -91,18 +58,9 @@ fn get_completion_items(
 fn get_options_to_completion_items_map(
 ) -> std::collections::HashMap<&'static str, Vec<tower_lsp::lsp_types::CompletionItem>> {
     let mut map = std::collections::HashMap::new();
-    map.insert(
-        "select",
-        get_completion_items(get_select_completion_details()),
-    );
-    map.insert(
-        "select_options",
-        get_completion_items(get_select_options_completion_details()),
-    );
-    map.insert(
-        "target_options",
-        get_completion_items(get_target_options_completion_details()),
-    );
+    map.insert("select", get_completion_items(get_select_completion_details()));
+    map.insert("select_options", get_completion_items(get_select_options_completion_details()));
+    map.insert("target_options", get_completion_items(get_target_options_completion_details()));
     map
 }
 
@@ -197,10 +155,7 @@ pub struct ServerTextDocumentItem {
 
 fn initialise_parser() -> tree_sitter::Parser {
     let mut parser = tree_sitter::Parser::new();
-    if parser
-        .set_language(tree_sitter_surrealql::language())
-        .is_err()
-    {
+    if parser.set_language(tree_sitter_surrealql::language()).is_err() {
         panic!("Failed to set parser language");
     }
     parser
@@ -217,12 +172,8 @@ fn normalize_document_and_cursor_position(
     }
     let join_char = " ";
 
-    let content_before_cursor = lines
-        .iter()
-        .take(cursor_line)
-        .copied()
-        .collect::<Vec<&str>>()
-        .join(join_char);
+    let content_before_cursor =
+        lines.iter().take(cursor_line).copied().collect::<Vec<&str>>().join(join_char);
 
     let cursor_char = content_before_cursor.len() + cursor_char + 1;
     let curr_doc = format!("{}\n", &lines.join(join_char));
@@ -344,14 +295,8 @@ fn get_completion_list(
 
         // suggest * if cursor is past but on the same line
         cursor.set_point_range(std::ops::Range {
-            start: tree_sitter::Point {
-                row: cursor_line,
-                column: 0,
-            },
-            end: tree_sitter::Point {
-                row: cursor_line,
-                column: usize::MAX,
-            },
+            start: tree_sitter::Point { row: cursor_line, column: 0 },
+            end: tree_sitter::Point { row: cursor_line, column: usize::MAX },
         });
         for match_ in cursor.matches(&QUERY_SELECT_2, tree.root_node(), curr_doc) {
             for capture in match_.captures.iter() {
@@ -413,9 +358,7 @@ impl tower_lsp::LanguageServer for Backend {
     }
 
     async fn initialized(&self, _: tower_lsp::lsp_types::InitializedParams) {
-        self.client
-            .log_message(tower_lsp::lsp_types::MessageType::INFO, "initialized!")
-            .await;
+        self.client.log_message(tower_lsp::lsp_types::MessageType::INFO, "initialized!").await;
     }
 
     async fn shutdown(&self) -> tower_lsp::jsonrpc::Result<()> {
@@ -480,10 +423,7 @@ impl tower_lsp::LanguageServer for Backend {
             match completion_list {
                 Some(list) => {
                     return Ok(Some(tower_lsp::lsp_types::CompletionResponse::List(
-                        tower_lsp::lsp_types::CompletionList {
-                            is_incomplete: true,
-                            items: list,
-                        },
+                        tower_lsp::lsp_types::CompletionList { is_incomplete: true, items: list },
                     )))
                 }
                 _ => return Ok(None),
@@ -501,9 +441,7 @@ async fn main() {
     let (stdin, stdout) = (tokio::io::stdin(), tokio::io::stdout());
 
     let (service, socket) = tower_lsp::LspService::build(Backend::new).finish();
-    tower_lsp::Server::new(stdin, stdout, socket)
-        .serve(service)
-        .await;
+    tower_lsp::Server::new(stdin, stdout, socket).serve(service).await;
 }
 
 #[cfg(test)]
