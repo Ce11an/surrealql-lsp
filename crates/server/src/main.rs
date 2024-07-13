@@ -206,6 +206,30 @@ fn initialise_parser() -> tree_sitter::Parser {
     parser
 }
 
+fn normalize_document_and_cursor_position(
+    doc: &str,
+    cursor_line: usize,
+    cursor_char: usize,
+) -> (String, usize, usize) {
+    let lines: Vec<&str> = doc.lines().collect();
+    if lines.len() <= 1 {
+        return (doc.to_string(), cursor_line, cursor_char);
+    }
+    let join_char = " ";
+
+    let content_before_cursor = lines
+        .iter()
+        .take(cursor_line)
+        .copied()
+        .collect::<Vec<&str>>()
+        .join(join_char);
+
+    let cursor_char = content_before_cursor.len() + cursor_char + 1;
+    let curr_doc = format!("{}\n", &lines.join(join_char));
+
+    (curr_doc, 0, cursor_char)
+}
+
 fn get_completion_list(
     curr_doc: &str,
     parser: &mut tree_sitter::Parser,
@@ -218,6 +242,9 @@ fn get_completion_list(
 ) -> Option<Vec<tower_lsp::lsp_types::CompletionItem>> {
     let cursor_line = params.text_document_position.position.line as usize;
     let cursor_char = params.text_document_position.position.character as usize;
+    let (curr_doc, cursor_line, cursor_char) =
+        normalize_document_and_cursor_position(curr_doc, cursor_line, cursor_char);
+    let curr_doc = &curr_doc;
 
     *curr_tree = parser.parse(curr_doc, curr_tree.as_ref());
     if let Some(tree) = curr_tree {
@@ -477,4 +504,42 @@ async fn main() {
     tower_lsp::Server::new(stdin, stdout, socket)
         .serve(service)
         .await;
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::normalize_document_and_cursor_position;
+
+    #[test]
+    fn correctly_normalizes_document() {
+        let doc = r#"
+abc
+def
+hij"#;
+        let cursor_line = 3;
+        let cursor_char = 2;
+
+        let expected = (" abc def hij\n".to_string(), 0, 11);
+        let out = normalize_document_and_cursor_position(doc, cursor_line, cursor_char);
+        assert_eq!(out, expected);
+
+        let doc = r#"abcdef
+hij
+klm"#;
+        let cursor_line = 1;
+        let cursor_char = 2;
+
+        let expected = ("abcdef hij klm\n".to_string(), 0, 9);
+        let out = normalize_document_and_cursor_position(doc, cursor_line, cursor_char);
+        assert_eq!(out, expected);
+        let doc = r#"SELECT * FROM table
+WH
+"#;
+        let cursor_line = 1;
+        let cursor_char = 2;
+
+        let expected = ("SELECT * FROM table WH\n".to_string(), 0, 22);
+        let out = normalize_document_and_cursor_position(doc, cursor_line, cursor_char);
+        assert_eq!(out, expected);
+    }
 }
