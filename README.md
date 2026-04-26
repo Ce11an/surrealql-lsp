@@ -2,7 +2,8 @@
 
 A Language Server Protocol (LSP) implementation for SurrealDB's query language, SurrealQL.
 
-__Work in Progress!__
+> [!IMPORTANT]
+> This repository is now archived and read-only. Please see the official [SurrealQL Language Server](https://github.com/surrealdb/surrealql-language-server).
 
 ## About
 SurrealQL LSP is built with Rust and leverages several powerful libraries:
